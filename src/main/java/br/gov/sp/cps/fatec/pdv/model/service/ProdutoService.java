@@ -11,6 +11,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Camada de Serviço de Negócio (Service Layer / Subject no Padrão Observer).
@@ -37,6 +39,11 @@ import java.util.Optional;
  * @author Cainã Antunes Silva
  */
 public class ProdutoService {
+
+    private static final Logger LOGGER = Logger.getLogger(ProdutoService.class.getName());
+    private static final int CODIGO_BARRAS_TAMANHO_MAXIMO = 50;
+    private static final int NOME_TAMANHO_MAXIMO = 120;
+    private static final BigDecimal PRECO_MAXIMO = new BigDecimal("9999999999.99");
 
     private final ProdutoRepository repository;
     private final List<ProdutoObserver> observers;
@@ -93,7 +100,7 @@ public class ProdutoService {
                 try {
                     observer.onProdutosChanged(Collections.unmodifiableList(listaAtualizada));
                 } catch (Exception e) {
-                    System.err.println("Erro ao notificar observador: " + e.getMessage());
+                    LOGGER.log(Level.SEVERE, "Falha ao notificar observador de produtos.", e);
                 }
             }
         });
@@ -131,10 +138,16 @@ public class ProdutoService {
      * @return Produto atualizado.
      */
     public Produto atualizar(Produto produto) {
+        if (produto == null) {
+            throw new IllegalArgumentException("Dados do produto não podem ser nulos.");
+        }
         if (produto.getId() == null) {
             throw new IllegalArgumentException("O produto deve possuir um ID para ser atualizado.");
         }
         validarRegrasProduto(produto);
+        if (repository.buscarPorId(produto.getId()).isEmpty()) {
+            throw new IllegalArgumentException("Produto não encontrado para o ID: " + produto.getId());
+        }
 
         // Validação de Código de Barras duplicado para outro produto diferente
         Optional<Produto> existente = repository.buscarPorCodigoBarras(produto.getCodigoBarras());
@@ -158,6 +171,9 @@ public class ProdutoService {
     public void excluir(Long id) {
         if (id == null) {
             throw new IllegalArgumentException("ID inválido para exclusão.");
+        }
+        if (repository.buscarPorId(id).isEmpty()) {
+            throw new IllegalArgumentException("Produto não encontrado para o ID: " + id);
         }
         repository.excluir(id);
         notificarObservadores();
@@ -194,10 +210,22 @@ public class ProdutoService {
         if (produto.getCodigoBarras() == null || produto.getCodigoBarras().trim().isEmpty()) {
             throw new IllegalArgumentException("O Código de Barras é obrigatório.");
         }
+        String codigoBarras = produto.getCodigoBarras().trim();
+        if (codigoBarras.length() > CODIGO_BARRAS_TAMANHO_MAXIMO) {
+            throw new IllegalArgumentException(
+                    "O Código de Barras deve ter no máximo " + CODIGO_BARRAS_TAMANHO_MAXIMO + " caracteres.");
+        }
+        produto.setCodigoBarras(codigoBarras);
 
         if (produto.getNome() == null || produto.getNome().trim().isEmpty()) {
             throw new IllegalArgumentException("O Nome do Produto é obrigatório.");
         }
+        String nome = produto.getNome().trim();
+        if (nome.length() > NOME_TAMANHO_MAXIMO) {
+            throw new IllegalArgumentException(
+                    "O Nome do Produto deve ter no máximo " + NOME_TAMANHO_MAXIMO + " caracteres.");
+        }
+        produto.setNome(nome);
 
         if (produto.getPreco() == null) {
             throw new IllegalArgumentException("O Preço do Produto é obrigatório.");
@@ -205,6 +233,12 @@ public class ProdutoService {
 
         if (produto.getPreco().compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("O Preço do Produto deve ser estritamente positivo (maior que zero).");
+        }
+        if (produto.getPreco().compareTo(PRECO_MAXIMO) > 0) {
+            throw new IllegalArgumentException("O Preço do Produto não pode ultrapassar R$ 9.999.999.999,99.");
+        }
+        if (produto.getPreco().stripTrailingZeros().scale() > 2) {
+            throw new IllegalArgumentException("O Preço do Produto deve ter no máximo duas casas decimais.");
         }
 
         if (produto.getQuantidadeEstoque() == null) {

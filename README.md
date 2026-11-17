@@ -231,7 +231,7 @@ classDiagram
 
 | Tecnologia / Decisão | Justificativa Didática |
 | :--- | :--- |
-| **Java 17+ (LTS)** | Linguagem padrão em instituições de ensino técnico e superior, fornecendo estabilidade corporativa aliada a recursos modernos da linguagem. |
+| **Java 25+ (LTS)** | Linguagem padrão em instituições de ensino técnico e superior, fornecendo estabilidade corporativa aliada a recursos modernos da linguagem. |
 | **Jakarta Persistence (JPA 3.1) & Hibernate 6.x** | Demonstra a separação fundamental entre **especificação padrão** (`jakarta.persistence.*`) e **provedor de implementação** (`org.hibernate.*`). Ensina aos alunos o paradigma ORM, ciclo de vida de entidades (*transient, managed, detached*), mapeamento de constraints e transações atômicas ACID sem acoplamento a SQL proprietário. |
 | **H2 Database (Embutido / Arquivo)** | **Zero-Configuration:** Elimina a necessidade de servidores de banco externos (MySQL/PostgreSQL/Docker), permitindo que estudantes e desenvolvedores executem a aplicação imediatamente. Os dados persistem no diretório local `./data/pdv_db.mv.db`. |
 | **Java Swing (Código Puro)** | Permite ao docente demonstrar a engenharia de componentes visuais (`JFrame`, `JPanel`), gerenciadores de layout (`CardLayout`, `GridBagLayout`, `BorderLayout`) e o controle rigoroso da **Event Dispatch Thread (EDT)**. |
@@ -245,41 +245,63 @@ classDiagram
 ```text
 exemplo_persistencia_JavaSwing/
 ├── .mvn/wrapper/                 # Binários e configuração do Maven Wrapper
-├── data/                         # Arquivos de banco de dados H2 gerados em tempo de execução
+├── data/                         # Criado em execução; banco H2 local (não distribuído)
 ├── src/
 │   ├── main/
 │   │   ├── java/br/gov/sp/cps/fatec/pdv/
 │   │   │   ├── Main.java                        # Ponto de entrada (Bootstrap, Pure DI e Look&Feel)
 │   │   │   ├── controller/
-│   │   │   │   └── ProdutoController.java       # Orquestrador MVC e ouvinte Observer
+│   │   │   │   ├── ProdutoController.java       # Orquestrador MVC e ouvinte Observer
+│   │   │   │   ├── VendaController.java         # Fluxo de registro de venda
+│   │   │   │   └── HistoricoVendasController.java # Consulta assíncrona de vendas
 │   │   │   ├── model/
 │   │   │   │   ├── entity/
-│   │   │   │   │   └── Produto.java             # Entidade JPA mapeada para tabela 'produtos'
+│   │   │   │   │   ├── Produto.java             # Entidade JPA mapeada para tabela 'produtos'
+│   │   │   │   │   ├── Cliente.java             # Cliente opcional vinculado à venda
+│   │   │   │   │   ├── Venda.java               # Cabeçalho e total da venda
+│   │   │   │   │   └── ItemVenda.java           # Snapshot do produto/quantidade vendido
 │   │   │   │   ├── observer/
 │   │   │   │   │   └── ProdutoObserver.java     # Interface funcional do padrão Observer
 │   │   │   │   ├── repository/
 │   │   │   │   │   ├── ProdutoRepository.java   # Abstração de persistência (Interface)
-│   │   │   │   │   └── ProdutoRepositoryImpl.java # Implementação com JPA / EntityManager
+│   │   │   │   │   ├── ProdutoRepositoryImpl.java # Implementação com JPA / EntityManager
+│   │   │   │   │   ├── VendaRepository.java     # Contrato de registro da venda
+│   │   │   │   │   ├── VendaRepositoryImpl.java # Venda e estoque na mesma transação
+│   │   │   │   │   └── ItemVendaSolicitado.java # Entrada do carrinho
 │   │   │   │   └── service/
-│   │   │   │       └── ProdutoService.java      # Regras de negócio, unicidade e Subject Observer
+│   │   │   │       ├── ProdutoService.java      # Regras de negócio e Observer
+│   │   │   │       └── VendaService.java        # Serviço do fluxo de vendas
 │   │   │   ├── util/
 │   │   │   │   └── JPAUtil.java                 # Gerenciador Singleton do EntityManagerFactory
 │   │   │   └── view/
-│   │   │       ├── MainFrame.java               # Janela com CardLayout para alternância de telas
-│   │   │       ├── ProdutoFormView.java         # Formulário de cadastro/edição com GridBagLayout
-│   │   │       ├── ProdutoListView.java         # Tabela de dados com JTable e ações CRUD
-│   │   │       └── tablemodel/
-│   │   │           └── ProdutoTableModel.java   # Modelo de tabela reativo (AbstractTableModel)
+│   │   │   │   ├── MainFrame.java               # Janela com CardLayout para alternância de telas
+│   │   │   │   ├── ProdutoFormView.java         # Formulário de cadastro/edição
+│   │   │   │   ├── ProdutoListView.java         # Tabela e ações CRUD
+│   │   │   │   ├── VendaView.java               # Entrada e carrinho de venda
+│   │   │   │   ├── HistoricoVendasView.java     # Histórico e detalhes de vendas
+│   │   │   │   └── tablemodel/
+│   │   │   │       └── ProdutoTableModel.java   # Modelo reativo da tabela de produtos
 │   │   └── resources/
 │   │       └── META-INF/
 │   │           └── persistence.xml              # Configuração JPA para banco H2 e testes
 │   └── test/java/br/gov/sp/cps/fatec/pdv/
 │       ├── model/repository/
-│       │   └── ProdutoRepositoryTest.java       # Teste de persistência e operações CRUD
-│       └── model/service/
-│           └── ProdutoServiceTest.java          # Teste de validações de negócio e Observer
+│       │   ├── ProdutoRepositoryTest.java       # Teste de persistência e operações CRUD
+│       │   └── VendaRepositoryTest.java         # Venda, totalização e rollback de estoque
+│       ├── model/service/
+│       │   └── ProdutoServiceTest.java          # Validações de negócio e Observer
+│       ├── controller/
+│       │   └── ProdutoControllerValidationTest.java # Validação de entrada do formulário
+│       └── view/
+│           ├── ProdutoFormViewTest.java         # Estados e limites do formulário
+│           ├── ProdutoListViewTest.java         # Filtro e seleção da listagem
+│           ├── VendaViewTest.java               # Consistência do carrinho
+│           └── HistoricoVendasViewTest.java      # Resumo e detalhes do histórico
 ├── pom.xml                                      # Descritor do Maven e dependências
+├── src/assembly/distribution.xml                # Conteúdo do ZIP de distribuição
+├── target/*-distribution.zip                    # ZIP de release (gerado no package)
 ├── mvnw / mvnw.cmd                              # Scripts executáveis do Maven Wrapper
+├── target/<aplicacao>.jar + target/lib/         # Pacote de distribuição criado pelo Maven
 └── README.md                                    # Plano de aula e documentação técnica integrada
 ```
 
@@ -288,7 +310,7 @@ exemplo_persistencia_JavaSwing/
 ## 8. Como Compilar e Executar
 
 ### Pré-requisitos
-- **Java JDK 17** ou superior instalado (`java -version`).
+- **Java JDK 25** ou superior instalado (`java -version`).
 - Acesso à internet na primeira execução para download automático de dependências pelo Maven Wrapper.
 
 ### 8.1. Execução via Maven Wrapper (Modo Desenvolvimento)
@@ -308,21 +330,53 @@ No terminal, posicionado na raiz do projeto:
 
 ---
 
-### 8.2. Compilação, Testes e Geração do Pacote JAR (Produção)
+### 8.2. Compilação, Testes e Geração do Pacote de Distribuição
 
-Para executar a suíte completa de testes automatizados e empacotar o projeto em um arquivo JAR executável autossuficiente:
+Para executar a suíte completa de testes e gerar o JAR com suas dependências:
 
 ```powershell
 # Limpar, testar e empacotar:
 .\mvnw.cmd clean package
 ```
 
-Após o término com `BUILD SUCCESS`, execute o artefato gerado:
+O resultado **não é um JAR autossuficiente**. O diretório `target` contém o JAR da aplicação e suas dependências de execução na pasta `target/lib`. O manifesto do JAR referencia essas bibliotecas por um caminho relativo (`lib/`); ao distribuir, mantenha o JAR e a pasta `lib` juntos, preservando a estrutura:
+
+```text
+pdv/
+├── exemplo_persistencia_JavaSwing-1.0.0.jar
+└── lib/
+    ├── hibernate-core-6.4.4.Final.jar
+    ├── h2-2.2.224.jar
+    └── ... demais dependências de execução
+```
+
+O `package` também gera automaticamente `target/exemplo_persistencia_JavaSwing-1.0.0-distribution.zip`. Esse ZIP contém o JAR executável, as dependências em `lib/` e este README; não contém testes, relatórios nem banco de dados. Extraia o ZIP mantendo a pasta `lib` ao lado do JAR. Também é possível copiar manualmente o JAR de `target` e `target/lib`.
+
+O destino precisa ser gravável para que o programa crie a pasta `data` e o arquivo H2 na primeira execução. Os dados ficam em `data/pdv_db.mv.db`, relativo ao diretório de trabalho de onde o aplicativo é iniciado; mantenha esse diretório estável e faça backup do banco antes de atualizações.
+
+Com Java 25 ou superior instalado e acessível no `PATH`, execute a partir do diretório que contém o JAR:
 
 ```powershell
-# Execução do executável empacotado:
-java -jar target/exemplo_persistencia_JavaSwing-1.0.0.jar
+# Windows PowerShell:
+java -jar .\exemplo_persistencia_JavaSwing-1.0.0.jar
 ```
+
+```bash
+# Linux / macOS:
+java -jar ./exemplo_persistencia_JavaSwing-1.0.0.jar
+```
+
+Como o classpath é relativo ao JAR, as dependências em `lib` são localizadas mesmo que `java -jar` seja executado a partir de outro diretório. A base H2, porém, é relativa ao diretório de trabalho atual.
+
+Para executar sem copiar os arquivos após compilar, use o próprio `target` como diretório de execução:
+
+```powershell
+Push-Location .\target
+java -jar .\exemplo_persistencia_JavaSwing-1.0.0.jar
+Pop-Location
+```
+
+Para desenvolvimento, os comandos `compile exec:java` e a execução direta pela IDE continuam disponíveis nas seções seguintes.
 
 ---
 
@@ -331,6 +385,133 @@ java -jar target/exemplo_persistencia_JavaSwing-1.0.0.jar
 2. Aguarde a indexação das dependências do `pom.xml`.
 3. Navegue até o arquivo `src/main/java/br/gov/sp/cps/fatec/pdv/Main.java`.
 4. Clique com o botão direito e selecione **Run 'Main.main()'**.
+
+### 8.4. Responsividade e Tratamento de Falhas
+
+A preparação do banco, a carga inicial de demonstração e as operações de consulta e CRUD são executadas em tarefas de segundo plano com `SwingWorker`, evitando bloquear a Event Dispatch Thread (EDT). A criação e atualização dos componentes Swing continua restrita à EDT. Se a inicialização ou uma operação de banco falhar, a aplicação registra a exceção e apresenta uma mensagem ao usuário; uma falha na carga inicial impede a abertura da janela para não ocultar o problema.
+
+O tema FlatLaf é aplicado como padrão e o tema do sistema operacional é usado somente como fallback caso o FlatLaf não possa ser configurado.
+
+### 8.5. Registro detalhado da implementação em andamento
+
+Este registro descreve as mudanças recentes para que seja possível acompanhar não apenas quais funcionalidades existem, mas também como elas se integram à arquitetura e como foram verificadas.
+
+#### Etapa 1 — Inicialização, responsividade e falhas (concluída)
+
+1. **Look & Feel:** `Main` configura FlatLaf antes de criar a interface. Nimbus não é aplicado depois; isso evita sobrescrever o tema inicialmente configurado. O tema do sistema é usado apenas se FlatLaf não puder ser configurado.
+2. **Preparação do banco:** a criação do repositório e a carga de produtos de demonstração são executadas em `SwingWorker`, fora da EDT. A janela só é criada depois de a preparação terminar com sucesso.
+3. **Operações da tela:** carregamento inicial, recarga, cadastro, edição e exclusão também são executados fora da EDT. A tabela, os diálogos e os demais componentes Swing continuam sendo manipulados na EDT.
+4. **Prevenção de comandos repetidos:** enquanto uma operação está em andamento, os botões de ação ficam desabilitados. A tela volta a habilitá-los quando a tarefa termina, inclusive quando ocorre uma falha.
+5. **Falhas explícitas:** erros de inicialização e persistência são registrados com a exceção completa e apresentados em uma mensagem ao usuário. Uma falha na carga de demonstração não é ignorada e impede que a aplicação continue como se tivesse iniciado normalmente. Em uma falha de inicialização, a fábrica JPA é fechada antes de apresentar o erro.
+
+#### Etapa 2 — Experiência do módulo de produtos (em andamento)
+
+1. **Busca imediata:** a página de catálogo agora filtra enquanto o usuário digita, procurando trechos sem diferenciar maiúsculas/minúsculas no nome ou no código de barras. O texto é tratado como literal, então caracteres como `.` e `*` não são interpretados como expressões regulares.
+2. **Limpeza do filtro:** o botão **Limpar busca** remove o termo e volta a exibir todos os produtos. Um termo sem correspondências deixa a tabela vazia, sem alterar ou excluir os dados persistidos.
+3. **Ordenação:** as colunas podem ser ordenadas pelos cabeçalhos da tabela. A busca e a ordenação atuam sobre a apresentação; não modificam a lista do repositório nem os registros do banco.
+4. **Seleção segura:** ao alterar o termo de busca ou recarregar os dados, a seleção é limpa para evitar que uma linha visualmente diferente permaneça selecionada. Quando uma linha está selecionada, a view converte seu índice visível para o índice do modelo antes de devolver o produto; isso evita editar ou excluir um registro diferente após filtro ou ordenação.
+5. **Contador:** o rodapé apresenta quantos produtos estão visíveis e quantos existem na lista carregada, por exemplo, `Exibindo 2 de 8 produto(s)`.
+6. **Limites do formulário e domínio:** código de barras (50 caracteres) e nome (120 caracteres) seguem os limites definidos nas colunas JPA; os campos da tela impedem digitação/paste além desses limites. O serviço também valida os limites independentemente da interface e remove espaços externos do código e do nome antes de persistir.
+7. **Preço:** a tela aceita vírgula ou ponto decimal, sem separador de milhar, e no máximo duas casas decimais. O domínio valida preço positivo, escala máxima de duas casas e o teto de `R$ 9.999.999.999,99` compatível com `precision = 12, scale = 2`.
+8. **Estoque:** o campo aceita somente inteiro não negativo, de `0` a `2.147.483.647`; entrada vazia, decimal, negativa ou acima do limite recebe uma mensagem objetiva.
+9. **Mensagens de validação:** erros detectados antes do acesso ao banco são apresentados como validação, enquanto falhas de infraestrutura continuam identificadas como falhas de operação. Mensagens de entrada indicam o formato esperado.
+
+#### Arquivos e validação desta entrega
+
+- `ProdutoListView` contém o campo de busca, o filtro e o sorter da tabela, o contador e a conversão correta da linha selecionada.
+- `ProdutoFormView` limita o comprimento dos campos conforme o modelo e apresenta as regras de preço e estoque nas dicas de preenchimento.
+- `ProdutoService` garante as regras de comprimento, faixa monetária, escala decimal e normalização textual, mesmo quando chamado sem a interface.
+- `ProdutoControllerValidationTest` cobre os formatos de preço e estoque; `ProdutoServiceTest` cobre limites do domínio, normalização, edição, duplicidade entre produtos e rejeição de IDs inexistentes.
+- `ProdutoFormViewTest` verifica transições entre cadastro e edição, limpeza do formulário e limites de comprimento; `ProdutoListViewTest` verifica filtro por nome e código, limpeza, busca sem resultados e identificação do produto após ordenação/filtro.
+- `ProdutoController` e `Main` mantêm o trabalho de persistência fora da EDT, como descrito na etapa 1.
+- Na conclusão do passo 2, a suíte tinha 23 testes. Com os testes de vendas, histórico, busca por nome na tela de venda e filtros no histórico, a suíte atual tem 33 testes; execute-os e gere o pacote no Windows com `.\mvnw.cmd clean package`. Os testes de componentes Swing rodam na EDT sem abrir uma janela e funcionam em ambiente sem monitor.
+
+**Verificação manual recomendada para fechar a validação de ponta a ponta:** executar a aplicação em ambiente gráfico e verificar o carregamento inicial, a busca e ordenação, a edição/exclusão da linha selecionada após filtro, entrada nos limites e operação com erro de banco. Os testes atuais cobrem validação, domínio e componentes Swing, mas não abrem `MainFrame` nem simulam diálogos, pois isso depende de um ambiente gráfico.
+
+### 8.6. Etapa 3 — Primeiro fluxo de vendas (em andamento)
+
+Esta entrega inicia a expansão do PDV para registrar vendas usando os produtos já cadastrados. O fluxo foi implementado ponta a ponta no núcleo de domínio e na interface Swing.
+
+#### Modelo persistido
+
+- `Cliente` representa o nome opcional informado no fechamento da venda.
+- `Venda` registra data/hora, valor total e o cliente opcional. Uma venda contém vários itens.
+- `ItemVenda` associa a venda ao produto e mantém quantidade, preço unitário e nome do produto no momento da compra. O nome e o preço são snapshots para preservar os detalhes vendidos mesmo que o cadastro do produto mude posteriormente.
+- Os mapeamentos estão registrados nas unidades JPA de produção e testes. O Hibernate cria/atualiza as tabelas `clientes`, `vendas` e `itens_venda` pela estratégia de schema já existente.
+
+```mermaid
+classDiagram
+    Cliente "0..1" <-- "0..*" Venda : cliente
+    Venda "1" *-- "1..*" ItemVenda : itens
+    Produto "1" <-- "0..*" ItemVenda : produto
+    class Venda {
+        Long id
+        LocalDateTime dataHora
+        BigDecimal valorTotal
+    }
+    class ItemVenda {
+        String nomeProduto
+        BigDecimal precoUnitario
+        Integer quantidade
+        BigDecimal subtotal
+    }
+```
+
+#### Regras e atomicidade
+
+1. A venda exige ao menos um item e quantidades estritamente positivas.
+2. O repositório consolida linhas repetidas do mesmo código para validar e baixar o estoque pela quantidade total.
+3. Produto, estoque, itens, eventual cliente e cabeçalho da venda são tratados em uma única transação JPA.
+4. Os produtos são lidos com bloqueio pessimista durante a transação. Se algum código não existir, o estoque for insuficiente ou a gravação falhar, ocorre rollback; nenhum item parcial, cliente da tentativa ou baixa de estoque deve permanecer.
+5. Os valores unitários e nomes são obtidos do banco, nunca confiados à tela. O total é calculado no servidor como soma do preço unitário multiplicado pela quantidade.
+6. O nome do cliente é opcional e limitado a 120 caracteres. Nesta primeira versão, não há cadastro/pesquisa de clientes nem identificador para deduplicação; se informado, cada venda cria seu registro de cliente. O fluxo ainda não inclui pagamento ou cancelamento.
+
+#### Fluxo de interface e arquivos
+
+- A página de catálogo possui o botão **Nova Venda**, que abre o terceiro cartão gerenciado por `MainFrame`.
+- `VendaView` permite buscar produtos pelo nome ou informar o código de barras, definir a quantidade, adicionar itens ao carrinho e acompanhar o valor parcial atualizado a cada inclusão ou remoção.
+- `VendaController` valida entradas simples na EDT e executa o fechamento em `SwingWorker`. O usuário recebe o identificador e o total confirmados; em caso de falha, recebe uma mensagem sem aparência de sucesso. Após o fechamento, o catálogo é recarregado para refletir o estoque.
+- `VendaService` mantém o ponto de entrada do domínio; `VendaRepositoryImpl` controla o `EntityManager`, bloqueios, transação e rollback.
+- Cobertura de `VendaRepositoryTest`: venda válida e baixa de estoque, totalização/snapshots, consolidação de itens repetidos, venda sem cliente, produto ausente e rollback integral quando um item fica sem estoque.
+- `VendaViewTest` verifica a consistência do carrinho, a busca de produtos pelo nome e o cálculo do valor parcial.
+
+**Próximos incrementos da etapa 3:** executar o fluxo manualmente com interface gráfica; implementar fluxo de clientes com identificador; avaliar pagamento e cancelamento com política explícita para estorno de estoque; ampliar testes dos estados assíncronos do controlador. O histórico e a consulta de vendas foram implementados na etapa 5.
+
+### 8.7. Etapa 4 — Preparação para distribuição (em andamento)
+
+#### Conteúdo do pacote e requisitos
+
+- `mvnw clean package` compila, executa os testes e produz `target/exemplo_persistencia_JavaSwing-1.0.0.jar`.
+- O JAR é leve e **não contém as dependências**. O plugin Maven copia as bibliotecas de execução para `target/lib`; o manifesto do JAR usa `Class-Path: lib/...`. A distribuição deve conter o JAR e a pasta `lib` no mesmo diretório relativo.
+- O runtime requer Java 25 ou superior e um ambiente desktop capaz de abrir uma janela Swing. Não é necessário instalar servidor de banco: o H2 é incluído em `lib`.
+- O primeiro início cria `data` no diretório de trabalho e inicializa o banco em `data/pdv_db.mv.db`. A pasta precisa permitir gravação e deve ser preservada entre versões para manter os dados.
+- O banco local não faz parte do artefato e não deve ser substituído durante uma atualização. Faça backup do arquivo H2 com a aplicação fechada antes de atualizar.
+
+#### Verificação do artefato
+
+Após `clean package`, confira que o JAR existe, que `target/lib` contém as dependências runtime e que cada entrada indicada no manifesto aponta para um arquivo existente. O empacotamento Maven é validado junto com os testes automatizados. Ainda é necessário fazer um teste visual em outra máquina ou ambiente limpo com interface gráfica, copiando apenas o JAR e `lib`, e confirmar a criação do banco e o funcionamento dos fluxos.
+
+As instruções de cópia, execução no Windows/Linux/macOS, localização dos dados e backup ficam na seção **8.2**. O ZIP de release agora é gerado automaticamente por Maven. Assinatura/publicação do artefato e smoke test automatizado em ambiente gráfico ficam para incrementos futuros.
+
+### 8.8. Etapa 5 — ZIP de release e histórico de vendas (em andamento)
+
+#### ZIP reprodutível
+
+- O Maven Assembly Plugin lê `src/assembly/distribution.xml` e cria `target/exemplo_persistencia_JavaSwing-1.0.0-distribution.zip` na fase `package`.
+- O pacote inclui o JAR principal, dependências de runtime no diretório relativo `lib/` e `README.md`. Ele não inclui arquivos H2, classes de teste ou relatórios.
+- A estrutura preserva o `Class-Path` relativo do manifesto, de modo que o JAR continua executável com `java -jar` após extração.
+- A validação deve confirmar a existência do ZIP, os três elementos do pacote e que as 19 dependências apontadas pelo manifesto estão presentes em `lib/`. Atualizações do número de dependências são incorporadas automaticamente a partir do escopo runtime do Maven.
+
+#### Consulta do histórico
+
+- O catálogo ganhou o botão **Histórico de vendas**, que abre uma página própria gerenciada pelo `CardLayout`.
+- A tela apresenta o identificador, data/hora, cliente (ou “Consumidor não informado”) e total. Ao selecionar uma venda, mostra itens, quantidade, preço unitário e subtotal.
+- O histórico permite combinar filtros por período (datas inicial e final em `dd/MM/aaaa`), nome do produto e nome do cliente; os resultados são atualizados durante a digitação e datas inválidas são informadas na tela.
+- `VendaRepository.listarTodas` busca os relacionamentos de cliente, itens e produto na mesma consulta, evitando acesso a entidades lazy depois de fechar o `EntityManager`.
+- `HistoricoVendasController` carrega o histórico e permite recarga fora da EDT com `SwingWorker`. Erros são registrados e exibidos no status da tela.
+- Testes cobrem consulta de vendas com os relacionamentos carregados, a apresentação/seleção de detalhes e os filtros de período, produto e cliente na view.
+
+**Ainda pendente para encerrar o passo 5:** testar a navegação e os detalhes numa sessão Swing real, confirmar o ZIP extraído e executado em máquina limpa e avaliar paginação/filtragem para históricos extensos.
 
 ---
 

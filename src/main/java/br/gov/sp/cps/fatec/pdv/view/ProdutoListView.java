@@ -11,13 +11,17 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
+import javax.swing.RowFilter;
+import javax.swing.table.TableRowSorter;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * Visão (View) da Listagem de Produtos em formato tabular ({@link JTable}).
@@ -42,11 +46,16 @@ public class ProdutoListView extends JPanel {
     private final JLabel lblTotalRegistros;
     private final JTable tabelaProdutos;
     private final ProdutoTableModel tableModel;
+    private final TableRowSorter<ProdutoTableModel> sorter;
+    private final JTextField campoBusca;
 
     private final JButton btnNovo;
     private final JButton btnEditar;
     private final JButton btnExcluir;
     private final JButton btnRecarregar;
+    private final JButton btnLimparBusca;
+    private final JButton btnNovaVenda;
+    private final JButton btnHistoricoVendas;
 
     public ProdutoListView() {
         setLayout(new BorderLayout(15, 15));
@@ -63,14 +72,28 @@ public class ProdutoListView extends JPanel {
         lblSubtitulo.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         lblSubtitulo.setForeground(Color.GRAY);
 
+        JPanel painelBusca = new JPanel(new BorderLayout(8, 0));
+        JLabel lblBusca = new JLabel("Buscar por nome ou código:");
+        campoBusca = new JTextField();
+        campoBusca.setToolTipText("Digite parte do nome ou do código de barras para filtrar a tabela.");
+        btnLimparBusca = new JButton("Limpar busca");
+        painelBusca.add(lblBusca, BorderLayout.WEST);
+        painelBusca.add(campoBusca, BorderLayout.CENTER);
+        painelBusca.add(btnLimparBusca, BorderLayout.EAST);
+
+        JPanel painelTopo = new JPanel(new BorderLayout(0, 12));
         painelCabecalho.add(lblTitulo);
         painelCabecalho.add(Box.createVerticalStrut(4));
         painelCabecalho.add(lblSubtitulo);
-        add(painelCabecalho, BorderLayout.NORTH);
+        painelTopo.add(painelCabecalho, BorderLayout.NORTH);
+        painelTopo.add(painelBusca, BorderLayout.SOUTH);
+        add(painelTopo, BorderLayout.NORTH);
 
-        // 2. Tabela Central com ScrollPane
+        // 2. Tabela central com ordenação por cabeçalho e filtro de busca
         tableModel = new ProdutoTableModel();
         tabelaProdutos = new JTable(tableModel);
+        sorter = new TableRowSorter<>(tableModel);
+        tabelaProdutos.setRowSorter(sorter);
         tabelaProdutos.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         tabelaProdutos.setRowHeight(28);
         tabelaProdutos.setFont(new Font("Segoe UI", Font.PLAIN, 13));
@@ -88,12 +111,32 @@ public class ProdutoListView extends JPanel {
         scrollPane.setBorder(BorderFactory.createTitledBorder(" Produtos Cadastrados "));
         add(scrollPane, BorderLayout.CENTER);
 
-        // 3. Rodapé com Ações e Contador de Registros
+        campoBusca.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            @Override
+            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                aplicarFiltroBusca();
+            }
+
+            @Override
+            public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                aplicarFiltroBusca();
+            }
+
+            @Override
+            public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                aplicarFiltroBusca();
+            }
+        });
+        btnLimparBusca.addActionListener(e -> campoBusca.setText(""));
+        sorter.addRowSorterListener(e -> atualizarContador());
+
+        // 3. Rodapé com ações e contador de registros
         JPanel painelRodape = new JPanel(new BorderLayout(10, 10));
 
-        lblTotalRegistros = new JLabel("Total: 0 produto(s)");
+        lblTotalRegistros = new JLabel();
         lblTotalRegistros.setFont(new Font("Segoe UI", Font.ITALIC, 12));
         lblTotalRegistros.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+        atualizarContador();
         painelRodape.add(lblTotalRegistros, BorderLayout.WEST);
 
         JPanel painelBotoes = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 5));
@@ -112,9 +155,16 @@ public class ProdutoListView extends JPanel {
         btnNovo.setPreferredSize(new Dimension(150, 35));
         btnNovo.setFont(new Font("Segoe UI", Font.BOLD, 12));
 
+        btnNovaVenda = new JButton("Nova Venda");
+        btnNovaVenda.setPreferredSize(new Dimension(130, 35));
+        btnHistoricoVendas = new JButton("Histórico de vendas");
+        btnHistoricoVendas.setPreferredSize(new Dimension(160, 35));
+
         painelBotoes.add(btnRecarregar);
         painelBotoes.add(btnExcluir);
         painelBotoes.add(btnEditar);
+        painelBotoes.add(btnNovaVenda);
+        painelBotoes.add(btnHistoricoVendas);
         painelBotoes.add(btnNovo);
 
         painelRodape.add(painelBotoes, BorderLayout.EAST);
@@ -128,9 +178,28 @@ public class ProdutoListView extends JPanel {
      * @param produtos Coleção de produtos a exibir.
      */
     public void atualizarTabela(List<Produto> produtos) {
+        tabelaProdutos.clearSelection();
         tableModel.setProdutos(produtos);
-        int total = (produtos != null) ? produtos.size() : 0;
-        lblTotalRegistros.setText(String.format("Total: %d produto(s) cadastrado(s)", total));
+        atualizarContador();
+    }
+
+    private void aplicarFiltroBusca() {
+        tabelaProdutos.clearSelection();
+        String termo = campoBusca.getText().trim();
+        if (termo.isEmpty()) {
+            sorter.setRowFilter(null);
+        } else {
+            RowFilter<ProdutoTableModel, Integer> filtro = RowFilter.regexFilter(
+                    "(?iu)" + Pattern.quote(termo), 1, 2);
+            sorter.setRowFilter(filtro);
+        }
+        atualizarContador();
+    }
+
+    private void atualizarContador() {
+        int exibidos = tabelaProdutos == null ? 0 : tabelaProdutos.getRowCount();
+        int total = tableModel == null ? 0 : tableModel.getRowCount();
+        lblTotalRegistros.setText(String.format("Exibindo %d de %d produto(s)", exibidos, total));
     }
 
     /**
@@ -142,7 +211,7 @@ public class ProdutoListView extends JPanel {
     public Produto getProdutoSelecionado() {
         int selectedRow = tabelaProdutos.getSelectedRow();
         if (selectedRow >= 0) {
-            return tableModel.getProdutoAt(selectedRow);
+            return tableModel.getProdutoAt(tabelaProdutos.convertRowIndexToModel(selectedRow));
         }
         return null;
     }
@@ -159,6 +228,14 @@ public class ProdutoListView extends JPanel {
         return tableModel;
     }
 
+    public JTextField getCampoBusca() {
+        return campoBusca;
+    }
+
+    public JButton getBtnLimparBusca() {
+        return btnLimparBusca;
+    }
+
     public JButton getBtnNovo() {
         return btnNovo;
     }
@@ -173,5 +250,13 @@ public class ProdutoListView extends JPanel {
 
     public JButton getBtnRecarregar() {
         return btnRecarregar;
+    }
+
+    public JButton getBtnNovaVenda() {
+        return btnNovaVenda;
+    }
+
+    public JButton getBtnHistoricoVendas() {
+        return btnHistoricoVendas;
     }
 }

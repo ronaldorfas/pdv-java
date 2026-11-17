@@ -16,6 +16,10 @@ import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DocumentFilter;
 
 import br.gov.sp.cps.fatec.pdv.model.entity.Produto;
 
@@ -110,6 +114,7 @@ public class ProdutoFormView extends JPanel {
         gbc.gridx = 1;
         gbc.gridy = 1;
         gbc.weightx = 1.0;
+        limitarComprimento(txtCodigoBarras, 50);
         painelCampos.add(txtCodigoBarras, gbc);
 
         // Campo Nome
@@ -123,6 +128,7 @@ public class ProdutoFormView extends JPanel {
         gbc.gridx = 1;
         gbc.gridy = 2;
         gbc.weightx = 1.0;
+        limitarComprimento(txtNome, 120);
         painelCampos.add(txtNome, gbc);
 
         // Campo Preço
@@ -132,7 +138,8 @@ public class ProdutoFormView extends JPanel {
         painelCampos.add(new JLabel("Preço Unitário R$ (*):"), gbc);
         txtPreco = new JTextField();
         txtPreco.setPreferredSize(new Dimension(150, 30));
-        txtPreco.setToolTipText("Exemplo: 19.99 (Utilize ponto ou vírgula)");
+        txtPreco.setToolTipText("Exemplo: 19,99. Use ponto ou vírgula; até 10 dígitos inteiros e 2 decimais.");
+        limitarComprimento(txtPreco, 13);
         gbc.gridx = 1;
         gbc.gridy = 3;
         gbc.weightx = 1.0;
@@ -145,7 +152,8 @@ public class ProdutoFormView extends JPanel {
         painelCampos.add(new JLabel("Quantidade Estoque (*):"), gbc);
         txtQuantidadeEstoque = new JTextField();
         txtQuantidadeEstoque.setPreferredSize(new Dimension(150, 30));
-        txtQuantidadeEstoque.setToolTipText("Exemplo: 10 (Número inteiro positivo ou zero)");
+        txtQuantidadeEstoque.setToolTipText("Informe um número inteiro entre 0 e 2.147.483.647.");
+        limitarComprimento(txtQuantidadeEstoque, 10);
         gbc.gridx = 1;
         gbc.gridy = 4;
         gbc.weightx = 1.0;
@@ -221,6 +229,28 @@ public class ProdutoFormView extends JPanel {
         this.txtPreco.setText("");
         this.txtQuantidadeEstoque.setText("");
         this.txtCodigoBarras.requestFocusInWindow();
+    }
+
+    private void limitarComprimento(JTextField campo, int tamanhoMaximo) {
+        ((AbstractDocument) campo.getDocument()).setDocumentFilter(new DocumentFilter() {
+            @Override
+            public void insertString(FilterBypass fb, int offset, String texto, AttributeSet attrs)
+                    throws BadLocationException {
+                replace(fb, offset, 0, texto, attrs);
+            }
+
+            @Override
+            public void replace(FilterBypass fb, int offset, int tamanhoRemovido, String texto, AttributeSet attrs)
+                    throws BadLocationException {
+                int tamanhoAtual = fb.getDocument().getLength();
+                int tamanhoDisponivel = tamanhoMaximo - tamanhoAtual + tamanhoRemovido;
+                if (texto != null && texto.length() > tamanhoDisponivel) {
+                    texto = texto.substring(0, Math.max(0, tamanhoDisponivel));
+                    java.awt.Toolkit.getDefaultToolkit().beep();
+                }
+                fb.replace(offset, tamanhoRemovido, texto, attrs);
+            }
+        });
     }
 
     // ==========================================

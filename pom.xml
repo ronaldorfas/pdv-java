@@ -120,6 +120,29 @@
                 </executions>
             </plugin>
 
+            <!-- Pacote ZIP com o JAR, bibliotecas e documentação de execução -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.7.1</version>
+                <executions>
+                    <execution>
+                        <id>distribution-zip</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <descriptors>
+                                <descriptor>src/assembly/distribution.xml</descriptor>
+                            </descriptors>
+                            <finalName>${project.artifactId}-${project.version}</finalName>
+                            <appendAssemblyId>true</appendAssemblyId>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
             <!-- Exec Maven Plugin (Execução via 'mvn exec:java') -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
