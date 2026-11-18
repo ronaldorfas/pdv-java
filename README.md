@@ -575,7 +575,182 @@ Em equipes, os estudantes deverão estender a base do projeto para conceber e im
 
 ---
 
-## 13. Histórico de Versões e Gitflow
+## 13. Encapsulamento, Herança, Abstração e Polimorfismo no Projeto
+
+Os quatro conceitos abaixo aparecem de forma integrada no PDV. Eles reduzem o acoplamento entre interface, regras de negócio e persistência, ao mesmo tempo em que reutilizam comportamentos das bibliotecas Java Swing e JPA.
+
+### 13.1. Encapsulamento
+
+Encapsulamento é a proteção do estado interno de uma classe e a exposição controlada de operações para acessá-lo ou alterá-lo.
+
+No projeto, os atributos da entidade `Produto` são declarados como privados:
+
+```java
+private Long id;
+private String codigoBarras;
+private String nome;
+private BigDecimal preco;
+private Integer quantidadeEstoque;
+```
+
+O acesso externo ocorre pelos métodos `get` e `set`:
+
+```java
+public BigDecimal getPreco() {
+    return preco;
+}
+
+public void setPreco(BigDecimal preco) {
+    this.preco = preco;
+}
+```
+
+**Exemplos no projeto:**
+
+- `Produto` mantém os dados em atributos privados e fornece getters/setters públicos.
+- `ProdutoTableModel` mantém privada a lista `produtos` e a altera pelo método `setProdutos`.
+- `ProdutoService` mantém privados o repositório e a lista de observadores.
+- `JPAUtil` esconde o `EntityManagerFactory` em um atributo estático privado e controla seu ciclo de vida pelos métodos públicos `getEntityManagerFactory`, `getEntityManager` e `close`.
+
+O encapsulamento não impede todo acesso por setters: ele organiza o acesso e permite que regras adicionais sejam centralizadas. As validações reais do produto são executadas em `ProdutoService.validarRegrasProduto`, evitando que telas ou repositórios repitam essa lógica.
+
+### 13.2. Herança
+
+Herança permite que uma classe reutilize atributos e comportamentos de uma classe já existente.
+
+Exemplos presentes no projeto:
+
+```java
+public class MainFrame extends JFrame {
+    // Janela principal da aplicação.
+}
+
+public class ProdutoListView extends JPanel {
+    // Painel da tela de listagem.
+}
+
+public class ProdutoTableModel extends AbstractTableModel {
+    // Modelo usado pela JTable.
+}
+```
+
+Também foram usados componentes Swing específicos que herdam a classe `JPanel`, como `ProdutoFormView`, `VendaView` e `HistoricoVendasView`.
+
+Nesse caso:
+
+- `MainFrame` herda recursos de `JFrame`, como criação da janela, título, tamanho e eventos de fechamento.
+- `ProdutoListView` herda recursos de `JPanel`, como layout e inserção na janela.
+- `ProdutoTableModel` herda recursos de `AbstractTableModel`, como notificação de alterações na tabela por `fireTableDataChanged`.
+
+A herança permite reutilizar comportamentos da biblioteca Swing sem copiar ou reimplementá-los.
+
+### 13.3. Abstração
+
+Abstração consiste em definir o que uma operação representa, sem exigir que o código consumidor conheça todos os detalhes de implementação.
+
+O projeto usa abstrações principalmente por meio de interfaces:
+
+```java
+public interface ProdutoRepository {
+    Produto salvar(Produto produto);
+    Produto atualizar(Produto produto);
+    void excluir(Long id);
+    Optional<Produto> buscarPorId(Long id);
+    Optional<Produto> buscarPorCodigoBarras(String codigoBarras);
+    List<Produto> listarTodos();
+}
+```
+
+`ProdutoRepositoryImpl` oferece a implementação concreta com JPA/Hibernate:
+
+```java
+public class ProdutoRepositoryImpl implements ProdutoRepository {
+    // Implementação usando EntityManager e transações JPA.
+}
+```
+
+Outro exemplo é o contrato do padrão Observer:
+
+```java
+@FunctionalInterface
+public interface ProdutoObserver {
+    void onProdutosChanged(List<Produto> produtos);
+}
+```
+
+O `ProdutoService` recebe um `ProdutoRepository`, não uma classe JPA concreta:
+
+```java
+private final ProdutoRepository repository;
+
+public ProdutoService(ProdutoRepository repository) {
+    this.repository = Objects.requireNonNull(repository);
+}
+```
+
+Essa abstração permite trocar ou testar a implementação de persistência sem alterar as regras de negócio. Também separa o contrato de observação das responsabilidades da tela.
+
+### 13.4. Polimorfismo
+
+Polimorfismo permite que objetos de tipos diferentes sejam tratados por uma referência comum e executem a implementação correspondente ao objeto real.
+
+Há polimorfismo de interface no repositório:
+
+```java
+ProdutoRepository repository = new ProdutoRepositoryImpl();
+ProdutoService service = new ProdutoService(repository);
+```
+
+A variável `repository` possui o tipo abstrato `ProdutoRepository`, mas aponta para o objeto concreto `ProdutoRepositoryImpl`. Quando `ProdutoService` chama `repository.salvar(produto)`, a execução é direcionada ao método implementado pela classe concreta.
+
+Outro exemplo está no Observer:
+
+```java
+public class ProdutoController implements ProdutoObserver {
+
+    @Override
+    public void onProdutosChanged(List<Produto> produtos) {
+        listView.atualizarTabela(produtos);
+    }
+}
+```
+
+O `ProdutoService` mantém referências do tipo `ProdutoObserver` e chama:
+
+```java
+observer.onProdutosChanged(listaAtualizada);
+```
+
+Em tempo de execução, o método da implementação registrada, neste projeto o `ProdutoController`, é chamado.
+
+O polimorfismo também ocorre nas classes herdadas e nos métodos sobrescritos:
+
+```java
+@Override
+public int getRowCount() {
+    return produtos.size();
+}
+
+@Override
+public Object getValueAt(int rowIndex, int columnIndex) {
+    // Converte os dados da entidade para a representação da JTable.
+}
+```
+
+`ProdutoTableModel` redefine métodos declarados pela hierarquia do Swing. Assim, `JTable` chama uma API comum de `TableModel/AbstractTableModel`, mas recebe o comportamento implementado especificamente para `Produto`.
+
+### 13.5. Relação entre os conceitos
+
+| Conceito | Aplicação principal no PDV | Benefício |
+| :--- | :--- | :--- |
+| Encapsulamento | Atributos privados de `Produto`, `ProdutoService` e `JPAUtil` | Protege o estado e centraliza o acesso |
+| Herança | `JFrame`, `JPanel` e `AbstractTableModel` estendidos pelas views | Reutiliza comportamentos prontos do Swing |
+| Abstração | `ProdutoRepository` e `ProdutoObserver` | Define contratos sem acoplamento à implementação |
+| Polimorfismo | Implementações de repositório, Observer e métodos `@Override` | Permite comportamentos específicos através de referências comuns |
+
+Em conjunto, os conceitos permitem que a camada de interface dependa de serviços e contratos, que o serviço não acesse diretamente detalhes JPA e que cada classe responda por uma responsabilidade clara.
+
+## 14. Histórico de Versões e Gitflow
 
 O repositório foi construído seguindo o modelo **Gitflow** e convenções de **Conventional Commits**:
 
